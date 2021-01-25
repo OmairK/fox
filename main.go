@@ -5,7 +5,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/OmairK/fox/internal/server"
+	"github.com/OmairK/fox/server"
 )
 
 func main() {
