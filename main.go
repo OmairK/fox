@@ -12,7 +12,6 @@ func main() {
 	service := ":8000"
 	sig := make(chan os.Signal)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
-
 	srv := server.NewServer(service)
 
 	select {

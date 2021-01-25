@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"os"
-	"os/signal"
 	"strings"
 	"time"
 )
@@ -90,55 +88,55 @@ func NewServer(service string) *TCPServer {
 	return srv
 }
 
-func server() {
-	arguments := os.Args
-	var port string = ":8080"
+// func server() {
+// 	arguments := os.Args
+// 	var port string = ":8080"
 
-	if len(arguments) == 1 {
-		fmt.Println("Using port 8080")
-	} else {
-		port = arguments[1]
-		fmt.Println("Using port ", port)
-	}
+// 	if len(arguments) == 1 {
+// 		fmt.Println("Using port 8080")
+// 	} else {
+// 		port = arguments[1]
+// 		fmt.Println("Using port ", port)
+// 	}
 
-	li, err := net.Listen("tcp", port)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+// 	li, err := net.Listen("tcp", port)
+// 	if err != nil {
+// 		fmt.Println(err)
+// 		return
+// 	}
 
-	defer li.Close()
+// 	defer li.Close()
 
-	conn, err := li.Accept()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+// 	conn, err := li.Accept()
+// 	if err != nil {
+// 		fmt.Println(err)
+// 		return
+// 	}
 
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, os.Interrupt)
+// 	signalChan := make(chan os.Signal, 1)
+// 	signal.Notify(signalChan, os.Interrupt)
 
-	go func() {
-		<-signalChan
-		fmt.Println("Gracefully stopping the server")
-		conn.Write([]byte("Server is stopping\n"))
-		conn.Close()
-	}()
+// 	go func() {
+// 		<-signalChan
+// 		fmt.Println("Gracefully stopping the server")
+// 		conn.Write([]byte("Server is stopping\n"))
+// 		conn.Close()
+// 	}()
 
-	for {
-		netData, err := bufio.NewReader(conn).ReadString('\n')
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		if strings.TrimSpace(string(netData)) == "STOP" {
-			fmt.Println("Exiting TCP server!")
-			return
-		}
+// 	for {
+// 		netData, err := bufio.NewReader(conn).ReadString('\n')
+// 		if err != nil {
+// 			fmt.Println(err)
+// 			return
+// 		}
+// 		if strings.TrimSpace(string(netData)) == "STOP" {
+// 			fmt.Println("Exiting TCP server!")
+// 			return
+// 		}
 
-		fmt.Print("-> ", string(netData))
-		t := time.Now()
-		myTime := t.Format(time.RFC3339) + "\n"
-		conn.Write([]byte(myTime))
-	}
-}
+// 		fmt.Print("-> ", string(netData))
+// 		t := time.Now()
+// 		myTime := t.Format(time.RFC3339) + "\n"
+// 		conn.Write([]byte(myTime))
+// 	}
+// }
