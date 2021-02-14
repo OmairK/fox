@@ -2,18 +2,48 @@ package server
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"log"
 	"net"
 	"strings"
-	"time"
+
+	"github.com/OmairK/fox/db"
 )
+
+func commandParser(action string, args int) ([]string, error) {
+	action = strings.TrimSpace(action)
+	res := strings.Split(action, " ")
+	if len(res) == args {
+		return res, nil
+	}
+	return nil, errors.New("Wrong number of arguments")
+
+}
+
+func performAction(action string, mdb *db.MemoryDB) string {
+	if strings.ToUpper(action[:3]) == "GET" {
+		key, err := commandParser(action[3:], 1)
+		if err == nil {
+			return mdb.Get(key[0])
+		}
+		return "Wrong number of arguments for 'get' command"
+	} else if strings.ToUpper(action[:3]) == "SET" {
+		args, err := commandParser(action[3:], 2)
+		if err == nil {
+			return mdb.Set(args[0], args[1])
+		}
+		return "Wrong number of arguments for 'set' command"
+	}
+	return "Invalid Command"
+}
 
 // TCPServer is the multi threaded tcp server
 type TCPServer struct {
-	listner     net.Listener
-	connections map[uint]net.Conn
-	quit        chan struct{}
+	Listner     net.Listener
+	Connections map[uint]net.Conn
+	Quit        chan struct{}
+	Database    *db.MemoryDB
 }
 
 func (ts *TCPServer) listen() {
@@ -21,9 +51,9 @@ func (ts *TCPServer) listen() {
 	ConnID = 0
 	fmt.Println("Waiting for connections")
 	for {
-		conn, err := ts.listner.Accept()
+		conn, err := ts.Listner.Accept()
 		if err != nil {
-			if _, ok := <-ts.quit; ok {
+			if _, ok := <-ts.Quit; ok {
 				log.Println("New Connection error!", err.Error())
 				continue
 			} else {
@@ -31,13 +61,13 @@ func (ts *TCPServer) listen() {
 				break
 			}
 		}
-		ts.connections[ConnID] = conn
+		ts.Connections[ConnID] = conn
 		go func(id uint) {
 			log.Printf("Connection with ID %d joined!", id)
 			ts.handleConnection(conn)
 			log.Printf("Connection with ID %d leaving! ", id)
 			conn.Close()
-			delete(ts.connections, id)
+			delete(ts.Connections, id)
 		}(ConnID)
 		ConnID++
 
@@ -59,11 +89,9 @@ func (ts *TCPServer) handleConnection(conn net.Conn) {
 			fmt.Println("Exiting TCP server!")
 			return
 		}
-
-		fmt.Print("-> ", string(netData))
-		t := time.Now()
-		myTime := t.Format(time.RFC3339) + "\n"
-		conn.Write([]byte(myTime))
+		fmt.Print(netData)
+		result := performAction(netData, ts.Database) + "\n"
+		conn.Write([]byte(result))
 	}
 
 }
@@ -72,13 +100,13 @@ func (ts *TCPServer) handleConnection(conn net.Conn) {
 func (ts *TCPServer) Stop() {
 	log.Printf("Server is stopping")
 	ts.broadcast("I dont feel so great Mr Stark...")
-	close(ts.quit)
-	ts.listner.Close()
+	close(ts.Quit)
+	ts.Listner.Close()
 }
 
 func (ts *TCPServer) broadcast(message string) {
 	message = message + "\n"
-	for _, conn := range ts.connections {
+	for _, conn := range ts.Connections {
 		conn.Write([]byte(message))
 	}
 
@@ -92,9 +120,13 @@ func NewServer(service string) *TCPServer {
 	}
 
 	srv := &TCPServer{
-		listner:     listner,
-		connections: map[uint]net.Conn{},
-		quit:        make(chan struct{}),
+		Listner:     listner,
+		Connections: map[uint]net.Conn{},
+		Quit:        make(chan struct{}),
+		Database: &db.MemoryDB{
+			Name: "new",
+			KeyV: make(map[string]string),
+		},
 	}
 	go srv.listen()
 	return srv
