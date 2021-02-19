@@ -2,6 +2,8 @@ package server
 
 import (
 	"bufio"
+	"bytes"
+	"encoding/gob"
 	"errors"
 	"fmt"
 	"log"
@@ -42,6 +44,7 @@ func performAction(action string, mdb *db.MemoryDB) string {
 type TCPServer struct {
 	Listner     net.Listener
 	Connections map[uint]net.Conn
+	Close       chan struct{}
 	Quit        chan struct{}
 	Database    *db.MemoryDB
 }
@@ -63,7 +66,7 @@ func (ts *TCPServer) listen() {
 		}
 		ts.Connections[ConnID] = conn
 		go func(id uint) {
-			log.Printf("Connection with ID %d joined!", id)
+			log.Printf("Connection with ID %d joined! ", id)
 			ts.handleConnection(conn)
 			log.Printf("Connection with ID %d leaving! ", id)
 			conn.Close()
@@ -75,7 +78,17 @@ func (ts *TCPServer) listen() {
 }
 
 func (ts *TCPServer) commit() {
-	fmt.Println("Commiting the changes")
+	<-ts.Close
+	fmt.Println("Commiting the changes...")
+	var writeBytes bytes.Buffer
+	enc := gob.NewEncoder(&writeBytes)
+	err := enc.Encode(ts.Database)
+	if err != nil {
+		log.Fatal("Encoding error: ", err)
+	}
+
+	fmt.Println("Changes persisted on the disk")
+
 }
 
 func (ts *TCPServer) handleConnection(conn net.Conn) {
@@ -92,6 +105,11 @@ func (ts *TCPServer) handleConnection(conn net.Conn) {
 		fmt.Print(netData)
 		result := performAction(netData, ts.Database) + "\n"
 		conn.Write([]byte(result))
+		if _, ok := <-ts.Close; !ok {
+			conn.Write([]byte("I dont feel so great Mr Stark..."))
+			conn.Close()
+
+		}
 	}
 
 }
@@ -99,9 +117,9 @@ func (ts *TCPServer) handleConnection(conn net.Conn) {
 // Stop handles the stopping of the TCPServer
 func (ts *TCPServer) Stop() {
 	log.Printf("Server is stopping")
-	ts.broadcast("I dont feel so great Mr Stark...")
-	close(ts.Quit)
 	ts.Listner.Close()
+	close(ts.Close)
+	<-ts.Quit
 }
 
 func (ts *TCPServer) broadcast(message string) {
