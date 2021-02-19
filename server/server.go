@@ -132,7 +132,7 @@ func (ts *TCPServer) broadcast(message string) {
 
 //NewServer creates a new instance of Server
 func NewServer(service string) *TCPServer {
-	listner, err := net.Listen("tcp", service)
+	listner, err := net.Listen("tcp", "0.0.0.0"+service)
 	if err != nil {
 		log.Fatal("Listener Error! ", err.Error())
 	}
